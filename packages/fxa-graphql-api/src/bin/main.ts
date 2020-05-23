@@ -8,8 +8,13 @@ import { Container } from 'typedi';
 import express from 'express';
 import mozlog from 'mozlog';
 import FxAccountClient from 'fxa-js-client';
+import { graphqlUploadExpress } from 'graphql-upload';
 
-import { configContainerToken, loggerContainerToken, fxAccountClientToken } from '../lib/constants';
+import {
+  configContainerToken,
+  loggerContainerToken,
+  fxAccountClientToken,
+} from '../lib/constants';
 import { setupAuthDatabase, setupProfileDatabase } from '../lib/db';
 import Config from '../config';
 
@@ -30,21 +35,25 @@ async function run() {
   Container.set(configContainerToken, Config);
 
   // Setup the auth client
-  Container.set(fxAccountClientToken, FxAccountClient(config.authServer.url, {}));
+  Container.set(
+    fxAccountClientToken,
+    FxAccountClient(config.authServer.url, {})
+  );
 
   // Setup the databases
   const authKnex = setupAuthDatabase(config.database.mysql.auth);
   const profileKnex = setupProfileDatabase(config.database.mysql.profile);
   if (config.env === 'development') {
-    authKnex.on('query', data => {
+    authKnex.on('query', (data) => {
       logger.info('Query', data);
     });
-    profileKnex.on('query', data => {
+    profileKnex.on('query', (data) => {
       logger.info('Query', data);
     });
   }
 
   const app = express();
+  app.use(graphqlUploadExpress({ maxFileSize: 10000000 }));
   const server = await createServer(config, logger);
   server.applyMiddleware({ app });
 
@@ -56,6 +65,6 @@ async function run() {
   });
 }
 
-run().catch(err => {
+run().catch((err) => {
   logger.error('startup', { err });
 });

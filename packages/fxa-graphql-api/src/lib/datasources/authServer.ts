@@ -20,7 +20,9 @@ function snakeToCamel(str: string) {
  * @param obj Object with string keys
  */
 export function snakeToCamelObject(obj: { [key: string]: any }) {
-  return Object.fromEntries(Object.entries(obj).map(([k, v]) => [snakeToCamel(k), v]));
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [snakeToCamel(k), v])
+  );
 }
 
 export class AuthServerSource extends DataSource {
@@ -51,5 +53,21 @@ export class AuthServerSource extends DataSource {
   public async hasRecoveryKey(): Promise<boolean> {
     const result = await this.authClient.recoveryKeyExists(this.token);
     return result.exists;
+  }
+
+  public recoveryEmailCreate(email: string): Promise<any> {
+    return this.authClient.recoveryEmailCreate(this.token, email);
+  }
+
+  public recoveryEmailDestroy(email: string): Promise<any> {
+    return this.authClient.recoveryEmailDestroy(this.token, email);
+  }
+
+  public recoveryEmailSetPrimaryEmail(email: string): Promise<any> {
+    return this.authClient.recoveryEmailSetPrimaryEmail(this.token, email);
+  }
+
+  public recoveryEmailSecondaryResendCode(email: string): Promise<any> {
+    return this.authClient.recoveryEmailSecondaryResendCode(this.token, email);
   }
 }
