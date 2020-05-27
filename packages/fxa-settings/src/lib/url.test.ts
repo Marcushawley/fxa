@@ -88,7 +88,7 @@ describe('hashParams', () => {
 
 describe('objToSearchString', () => {
   it('includes all keys with values', () => {
-    var params = {
+    const params = {
       hasValue: 'value',
       nullNotIncluded: null,
       undefinedNotIncluded: undefined,
@@ -104,7 +104,7 @@ describe('objToSearchString', () => {
 
 describe('objToHashString', () => {
   it('includes all keys with values', () => {
-    var params = {
+    const params = {
       hasValue: 'value',
       nullNotIncluded: null,
       undefinedNotIncluded: undefined,
@@ -120,7 +120,7 @@ describe('objToHashString', () => {
 
 describe('objToUrlString', () => {
   it('includes all keys with values', () => {
-    var params = {
+    const params = {
       hasValue: 'value',
       nullNotIncluded: null,
       undefinedNotIncluded: undefined,
@@ -186,7 +186,7 @@ describe('getOrigin', () => {
 
 describe('updateSearchString', () => {
   it('adds new params while leaving the old ones intact', () => {
-    var updated = updateSearchString('?foo=one', {
+    const updated = updateSearchString('?foo=one', {
       bar: 'two',
       baz: 'three',
     });
@@ -194,14 +194,14 @@ describe('updateSearchString', () => {
   });
 
   it('updates values for existing params', () => {
-    var updated = updateSearchString('?foo=one', {
+    const updated = updateSearchString('?foo=one', {
       foo: 'two',
     });
     expect(updated).toStrictEqual('?foo=two');
   });
 
   it('adds a search string if none exists', () => {
-    var updated = updateSearchString('http://example.com', {
+    const updated = updateSearchString('http://example.com', {
       bar: 'two',
       foo: 'one',
     });

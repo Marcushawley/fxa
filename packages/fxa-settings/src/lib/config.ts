@@ -17,6 +17,10 @@ export interface Config {
     gql: {
       url: string;
     };
+    // NOTE: due to the nature and specificity of the requests we need to
+    // talk directly to the auth server for the following routes:
+    // - POST /password/change/start
+    // - POST /password/change/finish
     auth: {
       url: string;
     };

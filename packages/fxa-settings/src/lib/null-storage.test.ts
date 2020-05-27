@@ -6,24 +6,24 @@ import NullStorage from './null-storage';
 
 let storage: NullStorage;
 
-beforeEach(function () {
+beforeEach(() => {
   storage = new NullStorage();
 });
 
-describe('get/set', function () {
-  it('can take a key value pair', function () {
+describe('get/set', () => {
+  it('can take a key value pair', () => {
     storage.setItem('key', 'value');
     expect(storage.getItem('key')).toStrictEqual('value');
   });
 
-  it('can take object values', function () {
+  it('can take object values', () => {
     storage.setItem('key', { foo: 'bar' });
     expect(storage.getItem('key').foo).toStrictEqual('bar');
   });
 });
 
-describe('remove', function () {
-  it('with a key clears item', function () {
+describe('remove', () => {
+  it('with a key clears item', () => {
     storage.setItem('key', 'value');
     storage.removeItem('key');
 
@@ -31,8 +31,8 @@ describe('remove', function () {
   });
 });
 
-describe('clear', function () {
-  it('clears all items', function () {
+describe('clear', () => {
+  it('clears all items', () => {
     storage.setItem('key', 'value');
     storage.clear();
 
