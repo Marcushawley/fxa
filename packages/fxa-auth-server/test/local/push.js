@@ -15,19 +15,27 @@ const path = require('path');
 
 const P = require(`${ROOT_DIR}/lib/promise`);
 const mocks = require('../mocks');
-const mockLog = mocks.mockLog;
 const mockUid = 'deadbeef';
-const mockConfig = {};
 
 const PUSH_PAYLOADS_SCHEMA_PATH = `${ROOT_DIR}/docs/pushpayloads.schema.json`;
 const TTL = '42';
 const pushModulePath = `${ROOT_DIR}/lib/push`;
 
 describe('push', () => {
-  let mockDb, mockDevices;
+  let mockDb, mockLog, mockDevices, mockStatsD, mockSendNotification;
+
+  function loadMockedPushModule() {
+    const mocks = {
+      'web-push': {
+        sendNotification: mockSendNotification
+      }
+    };
+    return proxyquire(pushModulePath, mocks)(mockLog, mockDb, {}, mockStatsD);
+  }
 
   beforeEach(() => {
     mockDb = mocks.mockDB();
+    mockLog = mocks.mockLog();
     mockDevices = [
       {
         id: '0f7aa00356e5416e82b3bef7bc409eef',
@@ -70,110 +78,69 @@ describe('push', () => {
         pushEndpointExpired: false,
       },
     ];
-  });
-
-  it('sendPush does not reject on empty device array', () => {
-    const thisMockLog = mockLog({
-      info: function (op, log) {
-        if (log.name === 'push.account_verify.success') {
-          assert.fail('must not call push.success');
-        }
-      },
-    });
-    const push = require(pushModulePath)(thisMockLog, mockDb, mockConfig);
-
-    return push.sendPush(mockUid, [], 'accountVerify');
-  });
-
-  it('sendPush sends notifications with a TTL of 0', () => {
-    let successCalled = 0;
-    const thisMockLog = mockLog({
-      info: function (op, log) {
-        if (log.name === 'push.account_verify.success') {
-          // notification sent
-          successCalled++;
-        }
-      },
-    });
-
-    const mocks = {
-      'web-push': {
-        sendNotification: function (sub, payload, options) {
-          assert.equal(options.TTL, '0', 'sends the proper ttl header');
-          return P.resolve();
-        },
-      },
+    mockStatsD = {
+      increment: sinon.spy()
     };
-
-    const push = proxyquire(pushModulePath, mocks)(
-      thisMockLog,
-      mockDb,
-      mockConfig
-    );
-    return push.sendPush(mockUid, mockDevices, 'accountVerify').then(() => {
-      assert.equal(successCalled, 2);
-    });
+    mockSendNotification = sinon.spy(async () => {});
   });
 
-  it('sendPush sends notifications with user-defined TTL', () => {
-    let successCalled = 0;
-    const thisMockLog = mockLog({
-      info: function (op, log) {
-        if (log.name === 'push.account_verify.success') {
-          // notification sent
-          successCalled++;
-        }
-      },
-    });
+  it('sendPush does not reject on empty device array', async () => {
+    const push = loadMockedPushModule();
+    await push.sendPush(mockUid, [], 'accountVerify');
+    assert.equal(mockSendNotification.callCount, 0);
+    assert.equal(mockLog.info.callCount, 0);
+    assert.equal(mockStatsD.increment.callCount, 0);
+  });
 
-    const mocks = {
-      'web-push': {
-        sendNotification: function (sub, payload, options) {
-          assert.equal(options.TTL, TTL, 'sends the proper ttl header');
-          return P.resolve();
-        },
-      },
-    };
+  it('sendPush logs metrics about successful sends', async () => {
+    const push = loadMockedPushModule();
+    await push.sendPush(mockUid, mockDevices, 'accountVerify');
+    assert.equal(mockSendNotification.callCount, 2);
+    assert.equal(mockLog.info.callCount, 5);
+    assert.equal(mockLog.info.getCall(0).args[0], "push.filteredUnsupportedDevice")
+    assert.equal(mockLog.info.getCall(1).args[0], "push.send.attempt")
+    assert.equal(mockLog.info.getCall(1).args[1].reason, "accountVerify")
+    assert.equal(mockLog.info.getCall(1).args[1].deviceId, mockDevices[0].id)
+    assert.equal(mockLog.info.getCall(2).args[0], "push.send.success")
+    assert.equal(mockLog.info.getCall(2).args[1].reason, "accountVerify")
+    assert.equal(mockLog.info.getCall(2).args[1].deviceId, mockDevices[0].id)
+    assert.equal(mockLog.info.getCall(3).args[0], "push.send.attempt")
+    assert.equal(mockLog.info.getCall(3).args[1].reason, "accountVerify")
+    assert.equal(mockLog.info.getCall(3).args[1].deviceId, mockDevices[1].id)
+    assert.equal(mockLog.info.getCall(4).args[0], "push.send.success")
+    assert.equal(mockLog.info.getCall(4).args[1].reason, "accountVerify")
+    assert.equal(mockLog.info.getCall(4).args[1].deviceId, mockDevices[1].id)
+  });
 
-    const push = proxyquire(pushModulePath, mocks)(
-      thisMockLog,
-      mockDb,
-      mockConfig
-    );
+  it('sendPush sends notifications with a TTL of 0', async () => {
+    const push = loadMockedPushModule();
+    await push.sendPush(mockUid, mockDevices, 'accountVerify');
+    assert.equal(mockSendNotification.callCount, 2);
+    assert.equal(mockSendNotification.getCall(0).args[2].TTL, '0', 'sends the proper ttl header');
+    assert.equal(mockSendNotification.getCall(1).args[2].TTL, '0', 'sends the proper ttl header');
+  });
+
+  it('sendPush sends notifications with user-defined TTL', async () => {
+    const push = loadMockedPushModule();
     const options = { TTL: TTL };
-    return push
-      .sendPush(mockUid, mockDevices, 'accountVerify', options)
-      .then(() => {
-        assert.equal(successCalled, 2);
-      });
+    await push.sendPush(mockUid, mockDevices, 'accountVerify', options);
+    assert.equal(mockSendNotification.callCount, 2);
+    assert.equal(mockSendNotification.getCall(0).args[2].TTL, TTL, 'sends the proper ttl header');
+    assert.equal(mockSendNotification.getCall(1).args[2].TTL, TTL, 'sends the proper ttl header');
   });
 
-  it('sendPush sends data', () => {
-    let count = 0;
+  it('sendPush sends data', async () => {
+    const push = loadMockedPushModule();
     const data = { foo: 'bar' };
-    const mocks = {
-      'web-push': {
-        sendNotification: function (sub, payload, options) {
-          count++;
-          assert.ok(sub.keys.p256dh);
-          assert.ok(sub.keys.auth);
-          assert.deepEqual(payload, Buffer.from(JSON.stringify(data)));
-          return P.resolve();
-        },
-      },
-    };
-
-    const push = proxyquire(pushModulePath, mocks)(
-      mockLog(),
-      mockDb,
-      mockConfig
-    );
     const options = { data: data };
-    return push
-      .sendPush(mockUid, mockDevices, 'accountVerify', options)
-      .then(() => {
-        assert.equal(count, 2);
-      });
+    await push.sendPush(mockUid, mockDevices, 'accountVerify', options);
+    assert.equal(mockSendNotification.callCount, 2);
+    assert.ok(mockSendNotification.getCall(0).args[0].keys.p256dh);
+    assert.ok(mockSendNotification.getCall(0).args[0].keys.auth);
+    assert.deepEqual(mockSendNotification.getCall(0).args[1], Buffer.from(JSON.stringify(data)));
+    assert.ok(mockSendNotification.getCall(1).args[0].keys.p256dh);
+    assert.ok(mockSendNotification.getCall(1).args[0].keys.auth);
+    assert.deepEqual(mockSendNotification.getCall(1).args[1], Buffer.from(JSON.stringify(data)));
   });
 
   it("sendPush doesn't push to ios devices if it is triggered with an unsupported command", () => {
@@ -193,7 +160,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       mockLog(),
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD,
     );
     const options = { data: data };
     return push
@@ -223,7 +191,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       mockLog(),
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD,
     );
     const options = { data: data };
     return push
@@ -254,7 +223,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       mockLog(),
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD,
     );
     const options = { data: data };
     return push
@@ -285,7 +255,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       mockLog(),
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD,
     );
     const options = { data: data };
     return push
@@ -312,7 +283,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       mockLog(),
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD,
     );
     const options = { data: data };
     return push
@@ -394,7 +366,7 @@ describe('push', () => {
       },
     ];
 
-    const push = require(pushModulePath)(thisMockLog, mockDb, mockConfig);
+    const push = require(pushModulePath)(thisMockLog, mockDb, mockConfig, mockStatsD);
     const options = { data: Buffer.from('foobar') };
     return push
       .sendPush(mockUid, devices, 'accountVerify', options)
@@ -421,7 +393,7 @@ describe('push', () => {
       },
     ];
 
-    const push = require(pushModulePath)(thisMockLog, mockDb, mockConfig);
+    const push = require(pushModulePath)(thisMockLog, mockDb, mockConfig, mockStatsD);
     return push.sendPush(mockUid, devices, 'accountVerify').then(() => {
       assert.equal(count, 1);
     });
@@ -446,7 +418,7 @@ describe('push', () => {
       },
     ];
 
-    const push = require(pushModulePath)(thisMockLog, mockDb, mockConfig);
+    const push = require(pushModulePath)(thisMockLog, mockDb, mockConfig, mockStatsD);
     return push.sendPush(mockUid, devices, 'accountVerify').then(() => {
       assert.equal(count, 1);
     });
@@ -474,7 +446,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       thisMockLog,
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD,
     );
     return push
       .sendPush(mockUid, [mockDevices[0]], 'accountVerify')
@@ -504,7 +477,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       thisMockLog,
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD,
     );
 
     return push
@@ -565,7 +539,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       thisMockLog,
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD,
     );
     // Careful, the argument gets modified in-place.
     const device = JSON.parse(JSON.stringify(mockDevices[0]));
@@ -613,7 +588,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       thisMockLog,
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD
     );
     // Careful, the argument gets modified in-place.
     const device = JSON.parse(JSON.stringify(mockDevices[0]));
@@ -651,7 +627,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       thisMockLog,
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD
     );
     return push
       .sendPush(mockUid, [mockDevices[0]], 'accountVerify')
@@ -671,7 +648,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       mockLog(),
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD
     );
     sinon.spy(push, 'sendPush');
     return push
@@ -727,7 +705,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       mockLog(),
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD
     );
     sinon.spy(push, 'sendPush');
     const deviceName = 'My phone';
@@ -769,7 +748,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       mockLog(),
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD
     );
     sinon.spy(push, 'sendPush');
     const idToDisconnect = mockDevices[0].id;
@@ -812,7 +792,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       mockLog(),
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD
     );
     sinon.spy(push, 'sendPush');
     const expectedData = {
@@ -850,7 +831,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       mockLog(),
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD
     );
     sinon.spy(push, 'sendPush');
     const expectedData = {
@@ -888,7 +870,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       mockLog(),
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD
     );
     sinon.stub(push, 'sendPush').callsFake(() => P.resolve());
 
@@ -918,7 +901,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       mockLog(),
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD
     );
     sinon.spy(push, 'sendPush');
     const expectedData = {
@@ -990,7 +974,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       thisMockLog,
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD
     );
     return push.sendPush(mockUid, mockDevices, 'accountVerify').then(() => {
       assert.equal(count, 2);
@@ -1012,7 +997,8 @@ describe('push', () => {
     const push = proxyquire(pushModulePath, mocks)(
       thisMockLog,
       mockDb,
-      mockConfig
+      mockConfig,
+      mockStatsD
     );
     return push.sendPush(mockUid, mockDevices, 'anUnknownReasonString').then(
       () => {
