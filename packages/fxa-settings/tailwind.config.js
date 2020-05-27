@@ -1,3 +1,5 @@
+const plugin = require('tailwindcss/plugin');
+
 module.exports = {
   purge: {
     content: ['./src/**/*.tsx', './public/index.html'],
@@ -171,5 +173,21 @@ module.exports = {
     },
   },
   variants: {},
-  plugins: [],
+  plugins: [
+    plugin(function ({ addUtilities }) {
+      const newUtilities = {
+        '.animate-duration-800': {
+          animationDuration: '800ms',
+        },
+        '.animate-infinite': {
+          animationIterationCount: 'infinite',
+        },
+        '.animate-rotate': {
+          animationName: 'rotate',
+        },
+      };
+
+      addUtilities(newUtilities, ['responsive']);
+    }),
+  ],
 };

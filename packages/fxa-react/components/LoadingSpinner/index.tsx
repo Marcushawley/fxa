@@ -1,6 +1,5 @@
 import React from 'react';
 import { ReactComponent as Spinner } from './spinner.svg';
-import './index.scss';
 
 export const LoadingSpinner = ({
   className = '',

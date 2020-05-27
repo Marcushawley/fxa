@@ -24,7 +24,7 @@ export const Settings = () => {
     return (
       <LoadingSpinner
         className="bg-grey-20 flex items-center flex-col justify-center h-screen select-none"
-        svgClassName="w-10 h-10"
+        svgClassName="w-10 h-10 animate-rotate animate-timing-linear animate-duration-800 animate-repeat-infinite"
       />
     );
   }
