@@ -1,5 +1,3 @@
-const plugin = require('tailwindcss/plugin');
-
 module.exports = {
   purge: {
     content: ['./src/**/*.tsx', './public/index.html'],
@@ -65,7 +63,7 @@ module.exports = {
       black: '#000',
       white: '#fff',
       grey: {
-        20: '#FAFAFB',
+        10: '#FAFAFB',
         50: '#F9F9FA',
         100: '#E7E7E7',
         200: '#C2C2C2',
@@ -173,21 +171,5 @@ module.exports = {
     },
   },
   variants: {},
-  plugins: [
-    plugin(function ({ addUtilities }) {
-      const newUtilities = {
-        '.animate-duration-800': {
-          animationDuration: '800ms',
-        },
-        '.animate-infinite': {
-          animationIterationCount: 'infinite',
-        },
-        '.animate-rotate': {
-          animationName: 'rotate',
-        },
-      };
-
-      addUtilities(newUtilities, ['responsive']);
-    }),
-  ],
+  plugins: [],
 };
