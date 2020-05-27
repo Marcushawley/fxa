@@ -22,7 +22,10 @@ export const Settings = () => {
 
   if (loading) {
     return (
-      <LoadingSpinner className="bg-grey-20 flex items-center flex-col justify-center h-screen select-none" />
+      <LoadingSpinner
+        className="bg-grey-20 flex items-center flex-col justify-center h-screen select-none"
+        svgClassName="w-10 h-10"
+      />
     );
   }
 
@@ -30,7 +33,12 @@ export const Settings = () => {
     return (
       <AppErrorDialog
         data-testid="error-dialog"
-        className="bg-grey-20 flex items-center flex-col justify-center h-screen"
+        classes={{
+          base: 'bg-grey-20 flex items-center flex-col justify-center h-screen',
+          container: 'text-center max-w-lg',
+          header: 'text-grey-600 font-header text-lg font-bold mb-3',
+          text: 'text-grey-400',
+        }}
         {...{ error }}
       />
     );
